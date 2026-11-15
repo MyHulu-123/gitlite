@@ -204,6 +204,9 @@ void Repository::tag(const std::string& tagname){
 }
 
 std::string Repository::checkRevision(const std::string& revision){
+    if(Utils::isFile(".gitlite/refs/tags/" + revision)){//tag
+        return Utils::readContentsAsString(".gitlite/refs/tags/" + revision);
+    }
     std::vector<std::string> hashes = Utils::plainFilenamesIn(".gitlite/objects");
     std::sort(hashes.begin(), hashes.end());
     for(const auto& hash : hashes){
@@ -217,10 +220,6 @@ std::string Repository::checkRevision(const std::string& revision){
 
 void Repository::tag(const std::string& tagname, const std::string& revision){
     checkTagName(tagname);
-    if(Utils::isFile(".gitlite/refs/tags/" + revision)){
-        ObjectDataBase::writeTag(tagname, Utils::readContentsAsString(".gitlite/refs/tags/" + revision));
-        return;
-    }
     std::string commitHash = checkRevision(revision);
     ObjectDataBase::writeTag(tagname, commitHash);
 }
@@ -310,6 +309,13 @@ void Repository::status(){
 }
 
 void Repository::checkBranchName(const std::string& branchname){
+    std::string filepath = ".gitlite/refs/heads/" + branchname;
+    if(!Utils::isFile(filepath)){
+        Utils::exitWithMessage("A branch with that name does not exist.");
+    }
+}
+
+void Repository::checkNewBranchName(const std::string& branchname){
     if(!ObjectDataBase::isValidTagName(branchname)){
         Utils::exitWithMessage("Incorrect operands.");
     }
@@ -319,18 +325,87 @@ void Repository::checkBranchName(const std::string& branchname){
 }
 
 void Repository::branch(const std::string& branchname){
-    checkBranchName(branchname);
+    checkNewBranchName(branchname);
     Commit currentCommit = ObjectDataBase::readCurrentCommit();
     ObjectDataBase::writeBranch(branchname, currentCommit);
 }
 
 void Repository::rmBranch(const std::string& branchname){
     std::string filepath = ".gitlite/refs/heads/" + branchname;
-    if(!Utils::isFile(filepath)){
-        Utils::exitWithMessage("A branch with that name does not exist.");
-    }
+    checkBranchName(branchname);
     if(branchname == Utils::readContentsAsString(".gitlite/HEADER")){
         Utils::exitWithMessage("Cannot remove the current branch.");
     }
     remove(filepath.c_str());
+}
+
+void Repository::checkoutBranch(const std::string& branchname){
+    std::string filepath = ".gitlite/refs/heads/" + branchname;
+    if(!Utils::isFile(filepath)){
+        Utils::exitWithMessage("No such branch exists.");
+    }
+    if(branchname == Utils::readContentsAsString(".gitlite/HEADER")){
+        Utils::exitWithMessage("No need to checkout the current branch.");
+    }
+    checkoutFiles(Utils::readContentsAsString(".gitlite/refs/heads/" + branchname));
+    ObjectDataBase::switchBranch(branchname);
+}
+
+void Repository::checkoutFile(const std::string& filename){
+    checkoutFileInCommit(ObjectDataBase::readCurrentCommit().getHash(), filename);
+}
+
+void Repository::checkoutFileInCommit(const std::string& revision, const std::string& filename){
+    std::string commitHash = checkRevision(revision);
+    Commit commit = ObjectDataBase::readCommit(commitHash);
+    Tree tree = ObjectDataBase::readTree(commit.getTree());
+    if(!tree.exist(filename)){
+        Utils::exitWithMessage("File does not exist in that commit.");
+    }
+    Blob temp = ObjectDataBase::readBlob(tree.getBlobHash(filename));
+    Utils::writeContents(filename, temp.getContent());
+}
+
+void Repository::reset(const std::string& revision){
+    std::string commitHash = checkRevision(revision);
+    checkoutFiles(commitHash);
+    ObjectDataBase::writeBranch(Utils::readContentsAsString(".gitlite/HEADER"), commitHash);
+}
+
+void Repository::checkoutFiles(const std::string& revision){//通过目标Commit修改工作区和暂存区
+    
+    std::string commitHash = checkRevision(revision);
+    Tree head = ObjectDataBase::readTree(ObjectDataBase::readCurrentCommit().getTree());
+    Tree idx = ObjectDataBase::readIndex();
+    Commit newTarget = ObjectDataBase::readCommit(commitHash);
+    Tree newTree = ObjectDataBase::readTree(newTarget.getTree());
+    std::set<std::string> allfiles;
+
+    std::vector<std::string> wtfiles = Utils::plainFilenamesIn(".");
+    IgnoreManager ignoreManager;
+    for(const auto& filename : wtfiles){
+        if(ignoreManager.isIgnore(filename))continue;
+        else allfiles.insert(filename);
+    }
+
+    for(const auto& f : allfiles){
+        bool inHead = head.exist(f);
+        bool inIndex = idx.exist(f);
+        bool inNewTree = newTree.exist(f);
+        bool inWt = Utils::isFile(f);
+        if(inNewTree && !inHead && !inIndex && inWt){
+            Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+        }
+    }
+    allfiles.clear();
+    for(const auto& entry : head.getEntries()){
+        if(!newTree.exist(entry.filename) ){
+            Utils::restrictedDelete(entry.filename);
+        }
+    }
+    for (const auto& entry : newTree.getEntries()) {
+        Blob b = ObjectDataBase::readBlob(entry.blobHash);
+        Utils::writeContents(entry.filename, b.getContent()); 
+    }
+    ObjectDataBase::writeIndex(newTree);
 }

@@ -83,20 +83,28 @@ void SomeObj::rmBranch(const std::string& branchname) {
 
 // ---------------- Subtask 4：checkout / reset ----------------
 
-void SomeObj::checkoutBranch(const std::string&) {
+void SomeObj::checkoutBranch(const std::string& branchname) {
     // TODO: 切换到指定分支
+    Repository repo;
+    repo.checkoutBranch(branchname);
 }
 
-void SomeObj::checkoutFile(const std::string&) {
+void SomeObj::checkoutFile(const std::string& filename) {
     // TODO: 用当前提交中的版本覆盖工作目录中的文件
+    Repository repo;
+    repo.checkoutFile(filename);
 }
 
-void SomeObj::checkoutFileInCommit(const std::string&, const std::string&) {
+void SomeObj::checkoutFileInCommit(const std::string& revision, const std::string& filename) {
     // TODO: 用指定 revision 的版本覆盖工作文件，支持标签与 id 缩写
+    Repository repo;
+    repo.checkoutFileInCommit(revision, filename);
 }
 
-void SomeObj::reset(const std::string&) {
+void SomeObj::reset(const std::string& revision) {
     // TODO: 解析 revision，检出指定提交并移动当前分支头
+    Repository repo;
+    repo.reset(revision);
 }
 
 // ---------------- Subtask 5：merge ----------------

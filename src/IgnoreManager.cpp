@@ -10,6 +10,9 @@ IgnoreManager::IgnoreManager()
         while (std::getline(ss, line))
         {
             if(line.empty())continue;
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
             if(line[0] == '#')continue;
             rule newrule;newrule.is_negation = false;
             size_t i = 0;

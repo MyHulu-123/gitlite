@@ -1,17 +1,4 @@
-samples/4-checkout-01.in:
-command/check: file wug.txt
-Expected:
-This is a wug.
-Actual:
-This is not a wug.
-
-Diff:
---- expected
-+++ actual
-@@ -1 +1 @@
--This is a wug.+This is not a wug.
-
-samples/4-checkout-07.in:
+samples/5-merge-01.in:
 command/check: absence of f.txt
 Expected:
 file absent
@@ -22,3 +9,59 @@ Diff:
 +++ actual
 @@ -1 +1 @@
 -file absent+file present
+samples/Bonus-remote-01.in:
+command/check: global-log
+Expected:
+32b081e2e096bc0288ee5e603d201cc3a4f2f115
+0d1eea8e440a52d27cb629e5171eb1f386db8a4b
+4c17b152db74b68b82e5f5d01aed7d7693bb1ac4
+Actual:
+===
+commit 0d1eea8e440a52d27cb629e5171eb1f386db8a4b
+Date: Sun Nov 15 17:15:35 2026 +0800
+Add k in repo 2
+
+===
+commit 4c17b152db74b68b82e5f5d01aed7d7693bb1ac4
+Date: Thu Jan 01 08:00:00 1970 +0800
+initial commit
+
+
+Diff:
+--- expected
++++ actual
+@@ -1,3 +1,10 @@
+-32b081e2e096bc0288ee5e603d201cc3a4f2f115
+-0d1eea8e440a52d27cb629e5171eb1f386db8a4b
+-4c17b152db74b68b82e5f5d01aed7d7693bb1ac4+===
++commit 0d1eea8e440a52d27cb629e5171eb1f386db8a4b
++Date: Sun Nov 15 17:15:35 2026 +0800
++Add k in repo 2
++
++===
++commit 4c17b152db74b68b82e5f5d01aed7d7693bb1ac4
++Date: Thu Jan 01 08:00:00 1970 +0800
++initial commit
++
+
+samples/Bonus-diff-01.in:
+command/check: diff
+Expected:
+diff --gitlite a/f.txt b/f.txt
+--- a/f.txt
++++ b/f.txt
+@@ -1,1 +1,1 @@
+-This is a wug.
++Another wug.
+Actual:
+
+Diff:
+--- expected
++++ actual
+@@ -1,6 +0,0 @@
+-diff --gitlite a/f.txt b/f.txt
+---- a/f.txt
+-+++ b/f.txt
+-@@ -1,1 +1,1 @@
+--This is a wug.
+-+Another wug.
