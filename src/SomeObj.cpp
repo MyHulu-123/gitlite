@@ -1,4 +1,5 @@
 #include "../include/SomeObj.h"
+#include "../include/Repository.h"
 
 SomeObj::SomeObj() {}
 
@@ -6,54 +7,78 @@ SomeObj::SomeObj() {}
 
 void SomeObj::init() {
     // TODO: 创建 .gitlite 目录、initial commit 与 master 分支
+    Repository repo;
+    repo.init();
 }
 
-void SomeObj::add(const std::string&) {
+void SomeObj::add(const std::string& filename) {
     // TODO: 将文件的当前内容加入暂存区
+    Repository repo;
+    repo.add(filename);
 }
 
-void SomeObj::commit(const std::string&) {
+void SomeObj::commit(const std::string& message) {
     // TODO: 将暂存区保存为新提交，并推进当前分支
+    Repository repo;
+    repo.commit(message);
 }
 
-void SomeObj::rm(const std::string&) {
+void SomeObj::rm(const std::string& filename) {
     // TODO: 将文件取消暂存，或标记为待删除
+    Repository repo;
+    repo.rm(filename);
 }
 
 // ---------------- Subtask 2：log / global-log / tag ----------------
 
 void SomeObj::log() {
     // TODO: 从当前提交沿第一个父提交打印日志
+    Repository repo;
+    repo.log();
 }
 
 void SomeObj::globalLog() {
     // TODO: 从所有本地分支、远程跟踪分支和标签出发，输出全部可达提交并按规范排序
+    Repository repo;
+    repo.globalLog();
 }
 
 void SomeObj::listTags() {
     // TODO: 按字典序打印所有标签及其目标提交 id
+    Repository repo;
+    repo.listTags();
 }
 
-void SomeObj::tag(const std::string&) {
+void SomeObj::tag(const std::string& tagname) {
     // TODO: 为当前提交创建轻量标签
+    Repository repo;
+    repo.tag(tagname);
 }
 
-void SomeObj::tag(const std::string&, const std::string&) {
+void SomeObj::tag(const std::string& tagname, const std::string& revision) {
     // TODO: 为指定提交或标签所指提交创建轻量标签
+    Repository repo;
+    repo.tag(tagname, revision);
 }
 
 // ---------------- Subtask 3：status / branch / rm-branch ----------------
 
 void SomeObj::status() {
     // TODO: 显示分支、暂存区、未暂存修改与未跟踪文件
+    Repository repo;
+    repo.status();
 }
 
-void SomeObj::branch(const std::string&) {
+void SomeObj::branch(const std::string& branchname) {
     // TODO: 新建指向当前提交的分支，不切换
+    Repository repo;
+    repo.branch(branchname);
 }
 
-void SomeObj::rmBranch(const std::string&) {
+void SomeObj::rmBranch(const std::string& branchname) {
     // TODO: 删除分支指针，不删除其提交
+    Repository repo;
+    repo.rmBranch(branchname);
 }
 
 // ---------------- Subtask 4：checkout / reset ----------------

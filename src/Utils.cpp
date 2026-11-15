@@ -160,6 +160,7 @@ bool Utils::restrictedDelete(const std::string& filepath) {
     std::string gitliteDir = parentDir + "/.gitlite";
 
     if (!isDirectory(gitliteDir)) {
+        message(gitliteDir);
         throw std::invalid_argument("not .gitlite working directory");
     }
     

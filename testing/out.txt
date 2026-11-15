@@ -1,0 +1,24 @@
+samples/4-checkout-01.in:
+command/check: file wug.txt
+Expected:
+This is a wug.
+Actual:
+This is not a wug.
+
+Diff:
+--- expected
++++ actual
+@@ -1 +1 @@
+-This is a wug.+This is not a wug.
+
+samples/4-checkout-07.in:
+command/check: absence of f.txt
+Expected:
+file absent
+Actual:
+file present
+Diff:
+--- expected
++++ actual
+@@ -1 +1 @@
+-file absent+file present
