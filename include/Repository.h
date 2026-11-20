@@ -16,6 +16,8 @@ private:
     void logCommit(const Commit& commit);
     std::string checkRevision(const std::string& revision);
     void checkoutFiles(const std::string& revision);
+    void checkStagedFiles();
+    Commit getParent(Commit& a, Commit& b);
 public:
     // 元数据目录名，即 ".gitlite"
     static std::string getGitliteDir();
@@ -38,6 +40,8 @@ public:
     void checkoutFile(const std::string& filename);
     void checkoutFileInCommit(const std::string& revision, const std::string& filename);
     void reset(const std::string& revision);
+
+    void merge(const std::string& branchname);
 };
 
 #endif // REPOSITORY_H;

@@ -33,4 +33,8 @@ const std::string Commit::getTimeFormat() const{
     strftime(buffer, sizeof(buffer), "%a %b %d %H:%M:%S %Y %z", &local_tm);
     return std::string(buffer);
 }
+
+bool Commit::operator<(const Commit& other) const{
+    return this->getHash() < other.getHash();
+}
 // 建议类 Commit 的实现文件，可按需使用或删除。

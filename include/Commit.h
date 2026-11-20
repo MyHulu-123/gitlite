@@ -21,5 +21,6 @@ public:
     const std::string& getParent() const;
     const std::string& getParent2() const;
     const std::string& getMessage() const;
+    bool operator<(const Commit&) const;
 };
 #endif // COMMIT_H

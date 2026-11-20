@@ -409,3 +409,167 @@ void Repository::checkoutFiles(const std::string& revision){//通过目标Commit
     }
     ObjectDataBase::writeIndex(newTree);
 }
+
+//merge
+void Repository::checkStagedFiles(){
+    Tree idx = ObjectDataBase::readIndex();
+    Tree head = ObjectDataBase::readTree(ObjectDataBase::readCurrentCommit().getTree());
+    if(idx.getHash() != head.getHash()){
+        Utils::exitWithMessage("You have uncommitted changes.");
+    }
+}
+
+Commit Repository::getParent(Commit& currentHead, Commit& branchHead){
+    std::set<Commit> currentParents;
+    std::queue<Commit> c_parents;
+    c_parents.push(currentHead);currentParents.insert(currentHead);
+    while (!c_parents.empty())
+    {
+        Commit _p = c_parents.front();c_parents.pop();
+        if(!_p.getParent().empty()){
+            Commit _p1 = ObjectDataBase::readCommit(_p.getParent());
+            if(currentParents.find(_p1) == currentParents.end())c_parents.push(_p1), currentParents.insert(_p);
+        }
+        if(!_p.getParent2().empty()){
+            Commit _p2 = ObjectDataBase::readCommit(_p.getParent2());
+            if(currentParents.find(_p2) == currentParents.end())c_parents.push(_p2), currentParents.insert(_p);
+        }
+    }
+
+    std::queue<Commit> b_parents;
+    std::set<Commit> triedParents;
+    b_parents.push(branchHead);
+    triedParents.insert(branchHead);
+    while (!b_parents.empty())
+    {
+        Commit _p = b_parents.front();b_parents.pop();
+        if(currentParents.find(_p) != currentParents.end()){
+            return _p;
+        }
+        if(!_p.getParent().empty()){
+            Commit _p1 = ObjectDataBase::readCommit(_p.getParent());
+            if(triedParents.find(_p1) == triedParents.end())b_parents.push(_p1), triedParents.insert(_p);
+        }
+        if(!_p.getParent2().empty()){
+            Commit _p2 = ObjectDataBase::readCommit(_p.getParent2());
+            if(triedParents.find(_p2) == triedParents.end())b_parents.push(_p2), triedParents.insert(_p);
+        }
+    }
+    return Commit("",0,"","wrong, you shouldn't see this.","");
+    
+}
+
+enum class MergeAction{
+    KEEP_OURS,
+    WRITE_THEIRS,
+    DELETE_FILE,
+    CONFLICT
+};
+
+
+void Repository::merge(const std::string& branchname){
+    checkStagedFiles();
+    checkBranchName(branchname);
+    if(Utils::readContentsAsString(".gitlite/HEADER") == branchname){
+        Utils::exitWithMessage("Cannot merge a branch with itself.");
+    }
+    std::string currentBranch = Utils::readContentsAsString(".gitlite/HEADER");
+    Commit currentHead = ObjectDataBase::readCurrentCommit();
+    Commit branchHead = ObjectDataBase::readCommit(Utils::readContentsAsString(".gitlite/refs/heads/" + branchname));
+    Commit parent = getParent(currentHead, branchHead);
+    
+    if(parent.getHash() == branchHead.getHash()){
+        Utils::exitWithMessage("Given branch is an ancestor of the current branch.");
+    }
+    if(parent.getHash() == currentHead.getHash()){//fast-forward
+        checkoutFiles(branchHead.getHash());
+        ObjectDataBase::writeBranch(currentBranch, branchHead);
+        Utils::exitWithMessage("Current branch fast-forwarded.");
+    }
+    //目前，index和currentHead一致
+    std::map<std::string, MergeAction> planned;
+    std::set<std::string> allfiles;
+    Tree currentTree = ObjectDataBase::readTree(currentHead.getTree());
+    Tree branchTree = ObjectDataBase::readTree(branchHead.getTree());
+    Tree parentTree = ObjectDataBase::readTree(parent.getTree());
+    for(const auto& entry : currentTree.getEntries())allfiles.insert(entry.filename);
+    for(const auto& entry : branchTree.getEntries())allfiles.insert(entry.filename);
+    for(const auto& entry : parentTree.getEntries())allfiles.insert(entry.filename);
+
+    for(auto& f : allfiles){
+        bool inParent = parentTree.exist(f);
+        bool inCurrent = currentTree.exist(f);
+        bool inBranch = branchTree.exist(f);
+        std::string hashParent = parentTree.getBlobHash(f);
+        std::string hashCurrent = currentTree.getBlobHash(f);
+        std::string hashBranch = branchTree.getBlobHash(f);
+
+        if(inParent && inCurrent && inBranch && hashParent == hashCurrent && hashParent != hashBranch){
+            planned[f] = MergeAction::WRITE_THEIRS;
+        }
+        else if(inParent && inCurrent && inBranch && hashParent != hashCurrent && hashParent == hashBranch)continue;
+        else if(hashCurrent == hashBranch)continue;
+        else if(!inParent && !inBranch && inCurrent)continue;
+        else if(!inParent && inBranch && !inCurrent)planned[f] = MergeAction::WRITE_THEIRS;
+        else if(inParent && hashParent == hashCurrent && !inBranch)planned[f] = MergeAction::DELETE_FILE;
+        else if(inParent && hashParent == hashBranch && !inCurrent)continue;
+        else if(hashBranch != hashCurrent)planned[f] = MergeAction::CONFLICT;
+    }
+
+
+    std::vector<std::string> wtfiles = Utils::plainFilenamesIn(".");
+    std::set<std::string> trueWtfiles;
+    IgnoreManager ignoreManager;
+    for(const auto& filename : wtfiles){
+        if(ignoreManager.isIgnore(filename))continue;
+        else trueWtfiles.insert(filename);
+    }
+
+    for(const auto& f : trueWtfiles){
+        if(planned.find(f) != planned.end() && !currentTree.exist(f)){
+            Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+        }
+    }
+    Tree idx = ObjectDataBase::readIndex();
+    bool haveConflict = false;
+    for(const auto& f : planned){
+        if (f.second == MergeAction::WRITE_THEIRS){
+            Blob b = ObjectDataBase::readBlob(branchTree.getBlobHash(f.first));
+            Utils::writeContents(f.first, b.getContent());
+            idx.add(f.first, b.getHash());
+        }
+        else if(f.second == MergeAction::DELETE_FILE){
+            Utils::restrictedDelete(f.first);
+            idx.remove(f.first);
+        }
+        else if(f.second == MergeAction::CONFLICT){
+            Blob currentBlob = Blob("");
+            if(!currentTree.getBlobHash(f.first).empty())
+            currentBlob = ObjectDataBase::readBlob(currentTree.getBlobHash(f.first));
+            Blob branchBlob = Blob("");
+            if(!branchTree.getBlobHash(f.first).empty())
+            branchBlob = ObjectDataBase::readBlob(branchTree.getBlobHash(f.first));
+            std::string currentContent = currentBlob.getContent();
+            std::string branchContent = branchBlob.getContent();
+            if(!currentContent.empty() && currentContent.back() != '\n')currentContent += '\n';
+            if(!branchContent.empty() && branchContent.back() != '\n')branchContent += '\n';
+            std::string final = "<<<<<<< HEAD\n" + currentContent + "=======\n" + branchContent + ">>>>>>>\n";
+            Blob finalBlob(final);
+            ObjectDataBase::writeBlob(finalBlob);
+            Utils::writeContents(f.first, final);
+            idx.add(f.first, finalBlob.getHash());
+
+            haveConflict = true;
+        }
+    }
+
+    //合并提交
+    ObjectDataBase::writeIndex(idx);
+    ObjectDataBase::writeTree(idx);
+    std::string message = "Merged " + branchname + " into " + currentBranch + ".";
+    time_t now = time(nullptr);
+    Commit commitMerge(idx.getHash(), now, currentHead.getHash(), message, branchHead.getHash());
+    ObjectDataBase::writeCommit(commitMerge);
+    if(haveConflict)Utils::message("Encountered a merge conflict.");
+    ObjectDataBase::writeBranch(currentBranch, commitMerge);
+}

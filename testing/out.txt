@@ -1,24 +1,13 @@
-samples/5-merge-01.in:
-command/check: absence of f.txt
-Expected:
-file absent
-Actual:
-file present
-Diff:
---- expected
-+++ actual
-@@ -1 +1 @@
--file absent+file present
 samples/Bonus-remote-01.in:
 command/check: global-log
 Expected:
-32b081e2e096bc0288ee5e603d201cc3a4f2f115
-0d1eea8e440a52d27cb629e5171eb1f386db8a4b
+8a39b893deed90595541a1d5cfad32fd119482f9
+88476fcf69c24a83c41bfb7ad7fa90fc50dd97a1
 4c17b152db74b68b82e5f5d01aed7d7693bb1ac4
 Actual:
 ===
-commit 0d1eea8e440a52d27cb629e5171eb1f386db8a4b
-Date: Sun Nov 15 17:15:35 2026 +0800
+commit 88476fcf69c24a83c41bfb7ad7fa90fc50dd97a1
+Date: Fri Nov 20 13:09:10 2026 +0800
 Add k in repo 2
 
 ===
@@ -31,11 +20,11 @@ Diff:
 --- expected
 +++ actual
 @@ -1,3 +1,10 @@
--32b081e2e096bc0288ee5e603d201cc3a4f2f115
--0d1eea8e440a52d27cb629e5171eb1f386db8a4b
+-8a39b893deed90595541a1d5cfad32fd119482f9
+-88476fcf69c24a83c41bfb7ad7fa90fc50dd97a1
 -4c17b152db74b68b82e5f5d01aed7d7693bb1ac4+===
-+commit 0d1eea8e440a52d27cb629e5171eb1f386db8a4b
-+Date: Sun Nov 15 17:15:35 2026 +0800
++commit 88476fcf69c24a83c41bfb7ad7fa90fc50dd97a1
++Date: Fri Nov 20 13:09:10 2026 +0800
 +Add k in repo 2
 +
 +===

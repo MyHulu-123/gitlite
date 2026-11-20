@@ -109,8 +109,10 @@ void SomeObj::reset(const std::string& revision) {
 
 // ---------------- Subtask 5：merge ----------------
 
-void SomeObj::merge(const std::string&) {
+void SomeObj::merge(const std::string& branchname) {
     // TODO: 将指定分支合并到当前分支
+    Repository repo;
+    repo.merge(branchname);
 }
 
 // ---------------- Bonus-1：add-remote / rm-remote / push / fetch / pull ----------------
