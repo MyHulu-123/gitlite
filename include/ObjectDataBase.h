@@ -25,6 +25,8 @@ public:
     static Tree readTree(const std::string& hash);
     static Commit readCommit(const std::string& hash);
 
+    static std::string getBranchPath(const std::string& branch);
+
     static void writeIndex(const Tree& tree);
     static Tree readIndex();
 

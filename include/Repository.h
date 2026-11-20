@@ -18,6 +18,13 @@ private:
     void checkoutFiles(const std::string& revision);
     void checkStagedFiles();
     Commit getParent(Commit& a, Commit& b);
+    void checkRemoteName(const std::string& name);
+    void checkRemoteExist(const std::string& name);
+
+    void checkRemoteParent(const std::string& remoteHeadHash);
+    void pushAllObjects(const std::string& remotePath);
+    void pullAllObjects(const std::string& remotePath);
+    void checkRemoteDirectory(const std::string& remotePath);
 public:
     // 元数据目录名，即 ".gitlite"
     static std::string getGitliteDir();
@@ -42,6 +49,12 @@ public:
     void reset(const std::string& revision);
 
     void merge(const std::string& branchname);
+
+    void addRemote(const std::string& n, const std::string& p);     // gitlite add-remote [远程名] [路径]/.gitlite
+    void rmRemote(const std::string& n);                            // gitlite rm-remote [远程名]
+    void push(const std::string& n, const std::string& b);          // gitlite push [远程名] [远程分支名]
+    void fetch(const std::string& n, const std::string& b);         // gitlite fetch [远程名] [远程分支名]
+    void pull(const std::string& n, const std::string& b);  
 };
 
 #endif // REPOSITORY_H;

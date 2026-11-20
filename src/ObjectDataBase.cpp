@@ -21,12 +21,14 @@ void ObjectDataBase::writeCommit(const Commit& commit) {
 }
 
 void ObjectDataBase::writeBranch(const std::string& name, const Commit& commit){
-    std::string filepath = Utils::join(".gitlite/refs/heads", name);
+    std::string filepath = getBranchPath(name);
+    if(filepath.empty())filepath = ".gitlite/refs/heads/" + name;
     Utils::writeContents(filepath, commit.getHash());
 }
 
 void ObjectDataBase::writeBranch(const std::string& name, const std::string& commit_hash){
-    std::string filepath = Utils::join(".gitlite/refs/heads", name);
+    std::string filepath = getBranchPath(name);
+    if(filepath.empty())filepath = ".gitlite/refs/heads/" + name;
     Utils::writeContents(filepath, commit_hash);
 }
 
@@ -104,6 +106,12 @@ Blob ObjectDataBase::readBlob(const std::string& hash){
     return blob;
 }
 
+std::string ObjectDataBase::getBranchPath(const std::string& branch){
+    if(Utils::isFile(".gitlite/refs/heads/" + branch))return ".gitlite/refs/heads/" + branch;
+    if(Utils::isFile(".gitlite/refs/remotes/" + branch))return ".gitlite/refs/remotes/" + branch;
+    return "";
+}
+
 Commit ObjectDataBase::readCommit(const std::string& hash){
     std::string filepath = Utils::join(".gitlite/objects", hash);
     std::string s[10];
@@ -122,8 +130,7 @@ Commit ObjectDataBase::readCommit(const std::string& hash){
 
 Commit ObjectDataBase::readCurrentCommit(){
     std::string currentBranch = Utils::readContentsAsString(".gitlite/HEADER");
-    std::string filepath = Utils::join(".gitlite/refs/heads", currentBranch);
-    std::string hash = Utils::readContentsAsString(filepath);
+    std::string hash = Utils::readContentsAsString(getBranchPath(currentBranch));
     return readCommit(hash);
 }
 

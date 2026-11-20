@@ -17,6 +17,8 @@ void Repository::init(){
     Utils::createDirectories(".gitlite/refs");
     Utils::createDirectories(".gitlite/refs/heads");
     Utils::createDirectories(".gitlite/refs/tags");
+    Utils::createDirectories(".gitlite/refs/remotes");
+    Utils::createDirectories(".gitlite/refs/remoteDirs");
     Commit commit("",0,"","initial commit","");
     ObjectDataBase::writeCommit(commit);
     ObjectDataBase::writeBranch("master", commit);
@@ -131,7 +133,19 @@ void Repository::globalLog(){
             q.push(commit);
         }
     }
-
+    std::vector<std::string> remotes = Utils::plainFilenamesIn(".gitlite/refs/remoteDirs");
+    for(const auto& remote : remotes){
+        std::vector<std::string> fs = Utils::plainFilenamesIn(".gitlite/refs/remotes/" + remote);
+        for(const auto& f : fs){
+            std::string commitHash = Utils::readContentsAsString(".gitlite/refs/remotes/" + remote + '/' + f);
+            if(hashSet.find(commitHash) == hashSet.end()){//不存在，将它加入
+                hashSet.insert(commitHash);
+                Commit commit = ObjectDataBase::readCommit(commitHash);
+                commitPool.push_back(commit);
+                q.push(commit);
+            }
+        }
+    }
     std::vector<std::string> tags = Utils::plainFilenamesIn(".gitlite/refs/tags");
     for(const auto& tag : tags){
         std::string commitHash = Utils::readContentsAsString(".gitlite/refs/tags/" + tag);
@@ -277,6 +291,14 @@ void Repository::status(){
 
     Utils::message("=== Branches ===");
     std::vector<std::string> branches = Utils::plainFilenamesIn(".gitlite/refs/heads");
+    std::vector<std::string> remotes = Utils::plainFilenamesIn(".gitlite/refs/remoteDirs");
+    for(const auto& remote : remotes){
+        std::vector<std::string> fs = Utils::plainFilenamesIn(".gitlite/refs/remotes/" + remote);
+        for(const auto& f : fs){
+            branches.push_back(remote + '/' + f);
+        }
+    }
+    std::sort(branches.begin(),branches.end());
     std::string currentBranch = Utils::readContentsAsString(".gitlite/HEADER");
     for(const auto& b : branches){
         if(b == currentBranch)Utils::message("*" + b);
@@ -309,7 +331,7 @@ void Repository::status(){
 }
 
 void Repository::checkBranchName(const std::string& branchname){
-    std::string filepath = ".gitlite/refs/heads/" + branchname;
+    std::string filepath = ObjectDataBase::getBranchPath(branchname);
     if(!Utils::isFile(filepath)){
         Utils::exitWithMessage("A branch with that name does not exist.");
     }
@@ -320,6 +342,9 @@ void Repository::checkNewBranchName(const std::string& branchname){
         Utils::exitWithMessage("Incorrect operands.");
     }
     if(Utils::isFile(".gitlite/refs/heads/" + branchname)){
+        Utils::exitWithMessage("A branch with that name already exists.");
+    }
+    if(Utils::isFile(".gitlite/refs/remoteDirs/" + branchname)){
         Utils::exitWithMessage("A branch with that name already exists.");
     }
 }
@@ -342,12 +367,13 @@ void Repository::rmBranch(const std::string& branchname){
 void Repository::checkoutBranch(const std::string& branchname){
     std::string filepath = ".gitlite/refs/heads/" + branchname;
     if(!Utils::isFile(filepath)){
-        Utils::exitWithMessage("No such branch exists.");
+        filepath = ".gitlite/refs/remotes/" + branchname;
+        if(!Utils::isFile(filepath))Utils::exitWithMessage("No such branch exists.");
     }
     if(branchname == Utils::readContentsAsString(".gitlite/HEADER")){
         Utils::exitWithMessage("No need to checkout the current branch.");
     }
-    checkoutFiles(Utils::readContentsAsString(".gitlite/refs/heads/" + branchname));
+    checkoutFiles(Utils::readContentsAsString(filepath));
     ObjectDataBase::switchBranch(branchname);
 }
 
@@ -466,7 +492,6 @@ enum class MergeAction{
     CONFLICT
 };
 
-
 void Repository::merge(const std::string& branchname){
     checkStagedFiles();
     checkBranchName(branchname);
@@ -475,7 +500,7 @@ void Repository::merge(const std::string& branchname){
     }
     std::string currentBranch = Utils::readContentsAsString(".gitlite/HEADER");
     Commit currentHead = ObjectDataBase::readCurrentCommit();
-    Commit branchHead = ObjectDataBase::readCommit(Utils::readContentsAsString(".gitlite/refs/heads/" + branchname));
+    Commit branchHead = ObjectDataBase::readCommit(Utils::readContentsAsString(ObjectDataBase::getBranchPath(branchname)));
     Commit parent = getParent(currentHead, branchHead);
     
     if(parent.getHash() == branchHead.getHash()){
@@ -572,4 +597,111 @@ void Repository::merge(const std::string& branchname){
     ObjectDataBase::writeCommit(commitMerge);
     if(haveConflict)Utils::message("Encountered a merge conflict.");
     ObjectDataBase::writeBranch(currentBranch, commitMerge);
+}
+
+//remote
+void Repository::checkRemoteName(const std::string& remoteName){
+    if(!ObjectDataBase::isValidTagName(remoteName)){
+        Utils::exitWithMessage("Incorrect operands.");
+    }
+    if(Utils::isFile(".gitlite/refs/remoteDirs/" + remoteName)){
+        Utils::exitWithMessage("A remote with that name already exists.");
+    }
+    if(Utils::isFile(".gitlite/refs/heads/" + remoteName)){
+        Utils::exitWithMessage("A remote with that name already exists.");
+    }
+}
+
+void Repository::checkRemoteExist(const std::string& remoteName){
+    if(!Utils::isFile(".gitlite/refs/remoteDirs/" + remoteName)){
+        Utils::exitWithMessage("A remote with that name does not exist.");
+    }
+}
+
+void Repository::addRemote(const std::string& remoteName, const std::string& path){
+    checkRemoteName(remoteName);
+    Utils::writeContents(".gitlite/refs/remoteDirs/" + remoteName, path);
+    Utils::createDirectories(".gitlite/refs/remotes/" + remoteName);
+}
+
+void Repository::rmRemote(const std::string& remoteName){
+    checkRemoteExist(remoteName);
+    std::string filepath = ".gitlite/refs/remoteDirs/" + remoteName;
+    remove(filepath.c_str());
+    filepath = ".gitlite/refs/remotes/" + remoteName;
+    remove(filepath.c_str());
+}
+
+void Repository::checkRemoteParent(const std::string& remoteHeadHash){
+    Commit currentHead = ObjectDataBase::readCurrentCommit();
+    std::queue<std::string> hashes;
+    hashes.push(currentHead.getHash());
+    while (!hashes.empty())
+    {
+        currentHead = ObjectDataBase::readCommit(hashes.front());
+        hashes.pop();
+        if(currentHead.getHash() == remoteHeadHash)return;
+        if(!currentHead.getParent().empty())hashes.push(currentHead.getParent());
+        if(!currentHead.getParent2().empty())hashes.push(currentHead.getParent2());
+    }
+    Utils::exitWithMessage("Please pull down remote changes before pushing.");
+}
+
+void Repository::checkRemoteDirectory(const std::string& remoteName){
+    if(!Utils::isFile(".gitlite/refs/remoteDirs/" + remoteName)){
+        Utils::exitWithMessage("Remote directory not found.");
+    }
+    std::string remotePath = Utils::readContentsAsString(".gitlite/refs/remoteDirs/" + remoteName);
+    if(remotePath.length() < 8 || remotePath.compare(remotePath.length() - 8, 8, ".gitlite") != 0){
+        Utils::exitWithMessage("Remote directory not found.");
+    }
+    if(!Utils::isDirectory(remotePath))Utils::exitWithMessage("Remote directory not found.");
+}
+
+void Repository::pushAllObjects(const std::string& remotePath){
+    std::vector<std::string> objs = Utils::plainFilenamesIn(".gitlite/objects");
+    for(const auto& f : objs){
+        std::string content = Utils::readContentsAsString(".gitlite/objects/" + f);
+        Utils::writeContents(remotePath + "/objects/" + f, content);
+    }
+}
+
+void Repository::pullAllObjects(const std::string& remotePath){
+    std::vector<std::string> objs = Utils::plainFilenamesIn(remotePath + "/objects");
+    for(const auto& f : objs){
+        std::string content = Utils::readContentsAsString(remotePath + "/objects/" + f);
+        Utils::writeContents(".gitlite/objects/" + f, content);
+    }
+}
+
+void Repository::push(const std::string& remoteName, const std::string& branch){
+    checkRemoteDirectory(remoteName);
+    std::string remotePath = Utils::readContentsAsString(".gitlite/refs/remoteDirs/" + remoteName);
+    if(Utils::isFile(remotePath + "/refs/heads/" + branch)){
+        std::string head = Utils::readContentsAsString(remotePath + "/refs/heads/" + branch);
+        checkRemoteParent(head);
+        pushAllObjects(remotePath);
+        Utils::writeContents(remotePath + "/refs/heads/" + branch, ObjectDataBase::readCurrentCommit().getHash());
+    }
+    else{
+        pushAllObjects(remotePath);
+        Utils::writeContents(remotePath + "/refs/heads/" + branch, ObjectDataBase::readCurrentCommit().getHash());
+    }
+} 
+
+void Repository::fetch(const std::string& remoteName, const std::string& branch){
+    checkRemoteDirectory(remoteName);
+    std::string remotePath = Utils::readContentsAsString(".gitlite/refs/remoteDirs/" + remoteName);
+    if(!Utils::isFile(remotePath + "/refs/heads/" + branch)){
+        Utils::exitWithMessage("That remote does not have that branch.");
+    }
+    pullAllObjects(remotePath);
+    std::string remoteHead = Utils::readContentsAsString(remotePath + "/refs/heads/" + branch);
+    //Utils::message(remoteHead);
+    Utils::writeContents(".gitlite/refs/remotes/" + remoteName + '/' + branch, remoteHead);
+}
+
+void Repository::pull(const std::string& remoteName, const std::string& branch){
+    fetch(remoteName, branch);
+    merge(remoteName + '/' + branch);
 }
